@@ -137,27 +137,20 @@ class ProductivityTracker {
       // Aggregate activities by minute
       const aggregatedActivities = this.aggregateActivitiesByMinute(rawActivities);
       
-      let totalMinutes = 0;
-      let productiveMinutes = 0;
-      
-      // Track app usage for categories
+      // Remove manual incrementation of totalMinutes and set after processing
       const categories: Record<string, number> = {};
+      let productiveMinutes = 0;
       
       // Process each aggregated activity
       for (const activity of aggregatedActivities) {
         const category = await this.categorizeActivityWithAI(activity.appName, activity.windowName);
-        
-        // Each activity represents 1 minute
-        totalMinutes += 1;
+
         if (category === 'productive') {
           productiveMinutes += 1;
         }
         
         // Track app usage for reporting
-        if (!categories[activity.appName]) {
-          categories[activity.appName] = 0;
-        }
-        categories[activity.appName] += 1;
+        categories[activity.appName] = (categories[activity.appName] || 0) + 1;
         
         console.log('\nProcessed Activity:');
         console.log(`Time: ${new Date(activity.timestamp).toLocaleTimeString()}`);
@@ -166,6 +159,9 @@ class ProductivityTracker {
         console.log(`Category: ${category}`);
       }
 
+      // Set totalMinutes to the number of aggregated activities
+      const totalMinutes = aggregatedActivities.length;
+      
       // Only send update if we have data
       if (totalMinutes > 0) {
         console.log("POST1");
