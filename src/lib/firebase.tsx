@@ -1,20 +1,32 @@
-import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+/**
+ * This file is kept for backward compatibility but doesn't initialize Firebase directly.
+ * Authentication is now handled through the server API.
+ */
 
-// Your web app's Firebase configuration
-// Replace with your actual Firebase config values
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+import authService, { User } from './auth-service';
+
+// Check if we're in a browser environment
+const isBrowser = typeof window !== 'undefined';
+
+// Compatibility methods for existing code
+export const getCurrentUser = (): User | null => {
+  // Skip on server-side
+  if (!isBrowser) return null;
+  return authService.getCurrentUser();
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const googleProvider = new GoogleAuthProvider();
+export const isLoggedIn = (): boolean => {
+  // Skip on server-side
+  if (!isBrowser) return false;
+  return authService.isLoggedIn();
+};
 
-export { auth, googleProvider };
+export const logout = (): void => {
+  // Skip on server-side
+  if (!isBrowser) return;
+  return authService.logout();
+};
+
+// For components that might still expect these
+export const auth = null;
+export const googleProvider = null;

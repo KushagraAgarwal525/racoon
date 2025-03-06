@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import { fetchWithErrorHandling } from '../utils/api-helpers';
 import { pipe } from "@screenpipe/browser";
 import { generateText } from "ai";
 import { ollama } from "ollama-ai-provider";
@@ -10,6 +11,7 @@ const BASE_CATEGORIES: Record<string, 'productive' | 'unproductive'> = {
   'cursor': 'productive',
   'spotify': 'unproductive',
   'netflix': 'unproductive',
+  'youtube': 'unproductive',
   'facebook': 'unproductive',
   'instagram': 'unproductive',
   'twitter': 'unproductive',
@@ -31,24 +33,27 @@ type ProductivityUpdate = {
   categories?: Record<string, number>;
 };
 
-class ProductivityTracker {
-  // Make userId accessible outside the class
-  readonly userId: string;
+class ProductivityService {
+  private userId: string | null = null;
   private updateInterval: NodeJS.Timeout | null = null;
   private lastProcessedTimestamp: string | null = null;
-
-  constructor(userId: string) {
-    this.userId = userId;
+  private isTracking: boolean = false;
+  
+  constructor() {
+    // Will be initialized when startTracking is called with a userId
   }
-
-  /**
-   * Start fetching data from Screenpipe and updating database
-   */
-  startTracking() {
-    if (this.updateInterval) {
-      return; // Already running
+  
+  startTracking(userId?: string) {
+    if (this.isTracking) return;
+    
+    if (!userId) {
+      console.error("Cannot start tracking without a userId");
+      return;
     }
-
+    
+    this.userId = userId;
+    this.isTracking = true;
+    
     console.log(`Starting productivity data processing for user ${this.userId}...`);
     
     // Set the last processed timestamp to now
@@ -64,22 +69,28 @@ class ProductivityTracker {
       this.processAndUpdateProductivity();
     }, 5000); // Wait 5 seconds before first run
   }
-
-  /**
-   * Stop the processing interval
-   */
+  
   stopTracking() {
+    if (!this.isTracking) return;
+    
+    this.isTracking = false;
+    
     if (this.updateInterval) {
       clearInterval(this.updateInterval);
       this.updateInterval = null;
       console.log(`Stopped productivity processing for user ${this.userId}`);
     }
   }
-
+  
   /**
    * Process Screenpipe data and update database
    */
   private async processAndUpdateProductivity(): Promise<void> {
+    if (!this.userId) {
+      console.error("Cannot update productivity without a userId");
+      return;
+    }
+    
     try {
       // Define time range to process - last minute or since last processing
       const endTime = new Date();
@@ -163,7 +174,6 @@ class ProductivityTracker {
       
       // Only send update if we have data
       if (totalMinutes > 0) {
-        console.log("POST1");
         const update: ProductivityUpdate = {
           userId: this.userId,
           taskId: uuidv4(), // Generate unique task ID
@@ -172,23 +182,17 @@ class ProductivityTracker {
           productiveTime: productiveMinutes,
           categories: categories
         };
-        console.log("POST2");
+        
         console.log(`Sending update: ${productiveMinutes}/${totalMinutes} minutes productive (${Math.round((productiveMinutes/totalMinutes)*100)}%)`);
 
-        // Send the update to the Express server instead of Next.js API
-        const serverUrl = 'https://racoon-server-kushagraagarwal-kushagraagarwals-projects.vercel.app';
-        const updateResponse = await fetch(`${serverUrl}/api/productivity/update`, {
+        // Send the update to the server
+        await fetchWithErrorHandling('/api/productivity/update', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(update),
         });
-
-        if (!updateResponse.ok) {
-          const errorData = await updateResponse.json();
-          throw new Error(`Failed to send productivity update: ${errorData.error || updateResponse.statusText}`);
-        }
 
         console.log(`Successfully updated productivity data`);
       } else {
@@ -202,7 +206,7 @@ class ProductivityTracker {
       console.error('Error calculating and updating productivity:', error);
     }
   }
-
+  
   /**
    * Helper function that aggregates activities by minute
    */
@@ -241,7 +245,7 @@ class ProductivityTracker {
     // Format: YYYY-MM-DD-HH-mm
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}-${String(date.getHours()).padStart(2, '0')}-${String(date.getMinutes()).padStart(2, '0')}`;
   }
-
+  
   /**
    * Categorize activity as productive or unproductive
    */
@@ -302,7 +306,11 @@ class ProductivityTracker {
       return 'unproductive';
     }
   }
-
+  
+  trackCompletedTask() {
+    // Method kept for backward compatibility
+  }
+  
   /**
    * Force an immediate update (useful for testing)
    */
@@ -311,35 +319,6 @@ class ProductivityTracker {
   }
 }
 
-// Singleton instance for easy access
-let instance: ProductivityTracker | null = null;
-
-/**
- * Initialize the productivity tracker for a specific user
- */
-export function initProductivityTracker(userId: string) {
-  console.log(`Initializing productivity tracker for user ID: ${userId}`);
-  
-  // Check if Screenpipe is available
-  if (typeof pipe === 'undefined' || !pipe) {
-    console.error("WARNING: Screenpipe is not available. Make sure @screenpipe/browser is properly imported and initialized.");
-  } else {
-    console.log("Screenpipe is available and ready to use");
-  }
-  
-  if (!instance || instance.userId !== userId) {
-    console.log(`Creating new ProductivityTracker instance for user ${userId}`);
-    instance = new ProductivityTracker(userId);
-  } else {
-    console.log(`Reusing existing ProductivityTracker instance for user ${userId}`);
-  }
-  
-  return instance;
-}
-
-/**
- * Get the current productivity tracker instance
- */
-export function getProductivityTracker() {
-  return instance;
-}
+// Create a singleton instance
+const productivityService = new ProductivityService();
+export default productivityService;

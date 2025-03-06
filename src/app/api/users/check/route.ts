@@ -1,23 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/firebase-admin';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get userId from query params
-    const searchParams = request.nextUrl.searchParams;
+    // Get the query parameters
+    const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
-    }
+    // Proxy the request to the Express server
+    const serverUrl = 'https://racoon-server-kushagraagarwal-kushagraagarwals-projects.vercel.app';
+    const url = new URL(`${serverUrl}/api/users/check`);
     
-    // Check if user exists in the database
-    const userDoc = await db.collection('users').doc(userId).get();
+    if (userId) url.searchParams.set('userId', userId);
     
-    return NextResponse.json({ exists: userDoc.exists });
+    const response = await fetch(url.toString());
+    const data = await response.json();
+    
+    // Return the same response
+    return NextResponse.json(data, { status: response.status });
     
   } catch (error) {
-    console.error('Error checking user:', error);
+    console.error('Error proxying user check request:', error);
     return NextResponse.json({ error: 'Failed to check user' }, { status: 500 });
   }
 }

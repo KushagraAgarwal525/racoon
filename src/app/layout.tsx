@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "@/components/ui/toaster";
+import { AuthProvider } from "@/lib/hooks/use-auth";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,9 +14,11 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const inter = Inter({ subsets: ["latin"] });
+
 export const metadata: Metadata = {
-  title: "Racoon • Screenpipe",
-  description: "Be accountable for your screen time.",
+  title: "Racoon - Productivity Tracker",
+  description: "Track your productivity and stay focused",
 };
 
 export default function RootLayout({
@@ -26,10 +29,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${inter.className} antialiased`}
       >
-        {children}
-        <Toaster />
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );
